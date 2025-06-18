@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block page_title %}Gestión de Usuarios{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4>Gestión de Usuarios</h4>
+        <p class="text-muted">Control de accesos y permisos del sistema</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Nombre</th>
+                        <th>Rol</th>
+                        <th>Fecha Creación</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in usuarios %}
+                    <tr>
+                        <td>{{ usuario.id }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-user-circle fa-lg me-2 text-muted"></i>
+                                <strong>{{ usuario.username }}</strong>
+                            </div>
+                        </td>
+                        <td>{{ usuario.nombre }}</td>
+                        <td>
+                            {% if usuario.rol == 'Administrador' %}
+                                <span class="badge bg-danger">
+                                    <i class="fas fa-crown me-1"></i>{{ usuario.rol }}
+                                </span>
+                            {% elif usuario.rol == 'Gestor' %}
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-user-tie me-1"></i>{{ usuario.rol }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-info">
+                                    <i class="fas fa-user me-1"></i>{{ usuario.rol }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ usuario.created_at.strftime('%d/%m/%Y') if usuario.created_at else 'N/A' }}</td>
+                        <td>
+                            <span class="badge bg-success">
+                                <i class="fas fa-check-circle me-1"></i>Activo
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Información de Roles -->
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card border-danger">
+            <div class="card-header bg-danger bg-opacity-10">
+                <h6 class="mb-0 text-danger">
+                    <i class="fas fa-crown me-2"></i>Administrador
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li><i class="fas fa-check text-success me-2"></i>Gestión completa de usuarios</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Acceso a todas las funciones</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Configuración del sistema</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-primary">
+            <div class="card-header bg-primary bg-opacity-10">
+                <h6 class="mb-0 text-primary">
+                    <i class="fas fa-user-tie me-2"></i>Gestor
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li><i class="fas fa-check text-success me-2"></i>Gestión de inventario</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Registro de piezas</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Consulta de reportes</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-info">
+            <div class="card-header bg-info bg-opacity-10">
+                <h6 class="mb-0 text-info">
+                    <i class="fas fa-user me-2"></i>Logística
+                </h6>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled mb-0">
+                    <li><i class="fas fa-check text-success me-2"></i>Registro de movimientos</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Consulta de trazabilidad</li>
+                    <li><i class="fas fa-check text-success me-2"></i>Gestión de kits</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

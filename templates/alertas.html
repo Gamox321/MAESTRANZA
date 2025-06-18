@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block page_title %}Alertas de Inventario{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4>Alertas de Stock</h4>
+        <p class="text-muted">Monitoreo de niveles mínimos de inventario</p>
+    </div>
+    <div>
+        <span class="badge bg-warning fs-6">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            {{ alertas|length }} alertas activas
+        </span>
+    </div>
+</div>
+
+{% if alertas %}
+<div class="row">
+    {% for alerta in alertas %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card border-warning">
+            <div class="card-header bg-warning bg-opacity-10 d-flex justify-content-between align-items-center">
+                <h6 class="mb-0 text-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Stock Bajo
+                </h6>
+                <button class="btn btn-sm btn-outline-success" onclick="resolverAlerta({{ alerta.id }})" title="Resolver">
+                    <i class="fas fa-check"></i>
+                </button>
+            </div>
+            <div class="card-body">
+                <h6 class="card-title">{{ alerta.pieza_desc }}</h6>
+                <p class="card-text">{{ alerta.mensaje }}</p>
+                
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <div class="fs-4 fw-bold text-danger">{{ alerta.stock_actual }}</div>
+                            <small class="text-muted">Stock Actual</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="fs-4 fw-bold text-warning">{{ alerta.stock_minimo }}</div>
+                        <small class="text-muted">Stock Mínimo</small>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <small class="text-muted">
+                    <i class="fas fa-clock me-1"></i>
+                    {{ alerta.created_at.strftime('%d/%m/%Y %H:%M') if alerta.created_at else 'N/A' }}
+                </small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="fas fa-check-circle fa-4x text-success mb-4"></i>
+    <h4 class="text-success">¡Excelente!</h4>
+    <h5 class="text-muted">No hay alertas activas</h5>
+    <p class="text-muted">Todos los niveles de stock están dentro de los parámetros normales.</p>
+    <a href="/piezas" class="btn btn-primary">
+        <i class="fas fa-cogs me-2"></i>
+        Gestionar Inventario
+    </a>
+</div>
+{% endif %}
+
+<!-- Resumen de Stock -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>
+                    Resumen de Estados de Stock
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded">
+                            <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+                            <h5 class="text-success" id="stock-normal">0</h5>
+                            <small class="text-muted">Stock Normal</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded">
+                            <i class="fas fa-exclamation-triangle fa-2x text-warning mb-2"></i>
+                            <h5 class="text-warning">{{ alertas|length }}</h5>
+                            <small class="text-muted">Stock Bajo</small>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 border rounded">
+                            <i class="fas fa-times-circle fa-2x text-danger mb-2"></i>
+                            <h5 class="text-danger" id="stock-agotado">0</h5>
+                            <small class="text-muted">Stock Agotado</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    cargarEstadisticasStock();
+});
+
+function resolverAlerta(alertaId) {
+    if (confirm('¿Está seguro de marcar esta alerta como resuelta?')) {
+        $.ajax({
+            url: `/api/alertas/${alertaId}/resolver`,
+            method: 'POST',
+            success: function() {
+                location.reload();
+            },
+            error: function() {
+                alert('Error al resolver la alerta');
+            }
+        });
+    }
+}
+
+function cargarEstadisticasStock() {
+    $.get('/api/piezas', function(piezas) {
+        let stockNormal = 0;
+        let stockAgotado = 0;
+        
+        piezas.forEach(function(pieza) {
+            if (pieza.stock_actual === 0) {
+                stockAgotado++;
+            } else if (pieza.stock_actual > pieza.stock_minimo) {
+                stockNormal++;
+            }
+        });
+        
+        $('#stock-normal').text(stockNormal);
+        $('#stock-agotado').text(stockAgotado);
+    });
+}
+</script>
+{% endblock %} 

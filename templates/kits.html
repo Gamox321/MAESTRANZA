@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block page_title %}Gestión de Kits{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4>Gestión de Kits</h4>
+        <p class="text-muted">Agrupa componentes para planificar mantenimientos</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalKit">
+        <i class="fas fa-plus me-2"></i>Nuevo Kit
+    </button>
+</div>
+
+<div class="row">
+    {% for kit in kits %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    <i class="fas fa-toolbox me-2"></i>{{ kit.nombre }}
+                </h6>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="editarKit({{ kit.id }})" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="eliminarKit({{ kit.id }})" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{{ kit.descripcion or 'Sin descripción' }}</p>
+                <div class="mt-3">
+                    <span class="badge bg-info">Kit de Mantenimiento</span>
+                </div>
+            </div>
+            <div class="card-footer">
+                <small class="text-muted">
+                    <i class="fas fa-calendar me-1"></i>
+                    Creado: {{ kit.created_at.strftime('%d/%m/%Y') if kit.created_at else 'N/A' }}
+                </small>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="text-center py-5">
+            <i class="fas fa-toolbox fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No hay kits registrados</h5>
+            <p class="text-muted">Crea tu primer kit para agrupar componentes</p>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalKit">
+                <i class="fas fa-plus me-2"></i>Crear Kit
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Modal para Nuevo/Editar Kit -->
+<div class="modal fade" id="modalKit" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalKitTitle">Nuevo Kit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formKit">
+                    <input type="hidden" id="kitId">
+                    <div class="mb-3">
+                        <label for="nombreKit" class="form-label">Nombre del Kit</label>
+                        <input type="text" class="form-control" id="nombreKit" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="descripcionKit" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="descripcionKit" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarKit">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let kits = [];
+
+$(document).ready(function() {
+    cargarKits();
+    
+    $('#btnGuardarKit').click(guardarKit);
+    
+    $('#modalKit').on('hidden.bs.modal', function() {
+        limpiarFormularioKit();
+    });
+});
+
+function cargarKits() {
+    $.get('/api/kits', function(data) {
+        kits = data;
+        // La actualización de la página se maneja via recarga
+    });
+}
+
+function limpiarFormularioKit() {
+    $('#formKit')[0].reset();
+    $('#kitId').val('');
+    $('#modalKitTitle').text('Nuevo Kit');
+}
+
+function editarKit(id) {
+    let kit = kits.find(k => k.id === id);
+    if (kit) {
+        $('#kitId').val(kit.id);
+        $('#nombreKit').val(kit.nombre);
+        $('#descripcionKit').val(kit.descripcion || '');
+        $('#modalKitTitle').text('Editar Kit');
+        $('#modalKit').modal('show');
+    }
+}
+
+function guardarKit() {
+    let data = {
+        nombre: $('#nombreKit').val(),
+        descripcion: $('#descripcionKit').val()
+    };
+    
+    $.ajax({
+        url: '/api/kits',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function() {
+            $('#modalKit').modal('hide');
+            location.reload(); // Recargar la página para mostrar el nuevo kit
+        },
+        error: function() {
+            alert('Error al guardar el kit');
+        }
+    });
+}
+
+function eliminarKit(id) {
+    if (confirm('¿Está seguro de eliminar este kit?')) {
+        // Implementar eliminación en el próximo request
+        alert('Funcionalidad de eliminación pendiente');
+    }
+}
+</script>
+{% endblock %} 

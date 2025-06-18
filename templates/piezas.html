@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+
+{% block page_title %}Gestión de Piezas{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4>Gestión de Piezas</h4>
+        <p class="text-muted">Registra y administra el inventario de piezas</p>
+    </div>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalPieza">
+        <i class="fas fa-plus me-2"></i>Nueva Pieza
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="tablaPiezas">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Descripción</th>
+                        <th>N° Serie</th>
+                        <th>Ubicación</th>
+                        <th>Stock Actual</th>
+                        <th>Stock Mínimo</th>
+                        <th>Precio</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Los datos se cargan vía JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Nueva/Editar Pieza -->
+<div class="modal fade" id="modalPieza" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Nueva Pieza</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formPieza">
+                    <input type="hidden" id="piezaId">
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <input type="text" class="form-control" id="descripcion" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="numeroSerie" class="form-label">Número de Serie</label>
+                        <input type="text" class="form-control" id="numeroSerie" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ubicacionFisica" class="form-label">Ubicación Física</label>
+                        <input type="text" class="form-control" id="ubicacionFisica" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="stockActual" class="form-label">Stock Actual</label>
+                            <input type="number" class="form-control" id="stockActual" min="0" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="stockMinimo" class="form-label">Stock Mínimo</label>
+                            <input type="number" class="form-control" id="stockMinimo" min="1" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="precio" class="form-label">Precio</label>
+                            <input type="number" class="form-control" id="precio" step="0.01" min="0" required>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardar">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Movimiento -->
+<div class="modal fade" id="modalMovimiento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar Movimiento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formMovimiento">
+                    <input type="hidden" id="movPiezaId">
+                    <div class="mb-3">
+                        <label class="form-label">Pieza</label>
+                        <input type="text" class="form-control" id="movPiezaDesc" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tipoMovimiento" class="form-label">Tipo de Movimiento</label>
+                        <select class="form-control" id="tipoMovimiento" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="entrada">Entrada</option>
+                            <option value="salida">Salida</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="cantidad" class="form-label">Cantidad</label>
+                        <input type="number" class="form-control" id="cantidad" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarMovimiento">Registrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let piezas = [];
+
+$(document).ready(function() {
+    cargarPiezas();
+    
+    $('#btnGuardar').click(guardarPieza);
+    $('#btnGuardarMovimiento').click(guardarMovimiento);
+    
+    $('#modalPieza').on('hidden.bs.modal', function() {
+        limpiarFormulario();
+    });
+});
+
+function cargarPiezas() {
+    $.get('/api/piezas', function(data) {
+        piezas = data;
+        mostrarPiezas();
+    });
+}
+
+function mostrarPiezas() {
+    let html = '';
+    piezas.forEach(function(pieza) {
+        let estadoClass = pieza.stock_actual <= pieza.stock_minimo ? 'text-danger' : 'text-success';
+        let estadoText = pieza.stock_actual <= pieza.stock_minimo ? 'Stock Bajo' : 'Normal';
+        let estadoBadge = pieza.stock_actual <= pieza.stock_minimo ? 'bg-warning' : 'bg-success';
+        
+        html += `
+            <tr>
+                <td>${pieza.id}</td>
+                <td><strong>${pieza.descripcion}</strong></td>
+                <td><code>${pieza.numero_serie}</code></td>
+                <td>${pieza.ubicacion_fisica}</td>
+                <td><span class="${estadoClass}">${pieza.stock_actual}</span></td>
+                <td>${pieza.stock_minimo}</td>
+                <td>$${parseFloat(pieza.precio).toFixed(2)}</td>
+                <td><span class="badge ${estadoBadge}">${estadoText}</span></td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="editarPieza(${pieza.id})" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-success" onclick="abrirMovimiento(${pieza.id}, '${pieza.descripcion}')" title="Movimiento">
+                            <i class="fas fa-exchange-alt"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="eliminarPieza(${pieza.id})" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    $('#tablaPiezas tbody').html(html);
+}
+
+function limpiarFormulario() {
+    $('#formPieza')[0].reset();
+    $('#piezaId').val('');
+    $('#modalTitle').text('Nueva Pieza');
+}
+
+function editarPieza(id) {
+    let pieza = piezas.find(p => p.id === id);
+    if (pieza) {
+        $('#piezaId').val(pieza.id);
+        $('#descripcion').val(pieza.descripcion);
+        $('#numeroSerie').val(pieza.numero_serie);
+        $('#ubicacionFisica').val(pieza.ubicacion_fisica);
+        $('#stockActual').val(pieza.stock_actual);
+        $('#stockMinimo').val(pieza.stock_minimo);
+        $('#precio').val(pieza.precio);
+        $('#modalTitle').text('Editar Pieza');
+        $('#modalPieza').modal('show');
+    }
+}
+
+function guardarPieza() {
+    let id = $('#piezaId').val();
+    let data = {
+        descripcion: $('#descripcion').val(),
+        numero_serie: $('#numeroSerie').val(),
+        ubicacion_fisica: $('#ubicacionFisica').val(),
+        stock_actual: parseInt($('#stockActual').val()),
+        stock_minimo: parseInt($('#stockMinimo').val()),
+        precio: parseFloat($('#precio').val())
+    };
+    
+    let url = id ? `/api/piezas/${id}` : '/api/piezas';
+    let method = id ? 'PUT' : 'POST';
+    
+    $.ajax({
+        url: url,
+        method: method,
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function() {
+            $('#modalPieza').modal('hide');
+            cargarPiezas();
+            mostrarNotificacion('Pieza guardada exitosamente', 'success');
+        },
+        error: function() {
+            mostrarNotificacion('Error al guardar la pieza', 'error');
+        }
+    });
+}
+
+function eliminarPieza(id) {
+    if (confirm('¿Está seguro de eliminar esta pieza?')) {
+        $.ajax({
+            url: `/api/piezas/${id}`,
+            method: 'DELETE',
+            success: function() {
+                cargarPiezas();
+                mostrarNotificacion('Pieza eliminada exitosamente', 'success');
+            },
+            error: function() {
+                mostrarNotificacion('Error al eliminar la pieza', 'error');
+            }
+        });
+    }
+}
+
+function abrirMovimiento(id, descripcion) {
+    $('#movPiezaId').val(id);
+    $('#movPiezaDesc').val(descripcion);
+    $('#formMovimiento')[0].reset();
+    $('#movPiezaId').val(id);
+    $('#movPiezaDesc').val(descripcion);
+    $('#modalMovimiento').modal('show');
+}
+
+function guardarMovimiento() {
+    let data = {
+        pieza_id: parseInt($('#movPiezaId').val()),
+        tipo_movimiento: $('#tipoMovimiento').val(),
+        cantidad: parseInt($('#cantidad').val()),
+        observaciones: $('#observaciones').val()
+    };
+    
+    $.ajax({
+        url: '/api/movimientos',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function() {
+            $('#modalMovimiento').modal('hide');
+            cargarPiezas();
+            mostrarNotificacion('Movimiento registrado exitosamente', 'success');
+        },
+        error: function() {
+            mostrarNotificacion('Error al registrar el movimiento', 'error');
+        }
+    });
+}
+
+function mostrarNotificacion(mensaje, tipo) {
+    let alertClass = tipo === 'success' ? 'alert-success' : 'alert-danger';
+    let html = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            ${mensaje}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    $('main').prepend(html);
+    setTimeout(function() {
+        $('.alert').fadeOut();
+    }, 3000);
+}
+</script>
+{% endblock %} 

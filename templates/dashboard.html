@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total Piezas</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="total-piezas">0</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-cogs fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Stock Total</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="stock-total">0</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-boxes fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Alertas Activas</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="alertas-activas">0</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation-triangle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Movimientos Hoy</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" id="movimientos-hoy">0</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exchange-alt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Alertas de Stock Bajo
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="alertas-recientes">
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-spinner fa-spin"></i> Cargando...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">
+                    <i class="fas fa-history me-2"></i>
+                    Movimientos Recientes
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="movimientos-recientes">
+                    <div class="text-center text-muted py-3">
+                        <i class="fas fa-spinner fa-spin"></i> Cargando...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.border-left-primary {
+    border-left: 4px solid #4e73df !important;
+}
+.border-left-success {
+    border-left: 4px solid #1cc88a !important;
+}
+.border-left-warning {
+    border-left: 4px solid #f6c23e !important;
+}
+.border-left-info {
+    border-left: 4px solid #36b9cc !important;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    cargarEstadisticas();
+    cargarAlertasRecientes();
+    cargarMovimientosRecientes();
+});
+
+function cargarEstadisticas() {
+    $.get('/api/piezas', function(piezas) {
+        $('#total-piezas').text(piezas.length);
+        
+        let stockTotal = 0;
+        piezas.forEach(function(pieza) {
+            stockTotal += pieza.stock_actual;
+        });
+        $('#stock-total').text(stockTotal);
+    });
+}
+
+function cargarAlertasRecientes() {
+    $('#alertas-recientes').html('<div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>');
+    
+    // Simular carga de alertas
+    setTimeout(function() {
+        $.get('/api/piezas', function(piezas) {
+            let alertasHtml = '';
+            let contadorAlertas = 0;
+            
+            piezas.forEach(function(pieza) {
+                if (pieza.stock_actual <= pieza.stock_minimo) {
+                    contadorAlertas++;
+                    alertasHtml += `
+                        <div class="alert alert-warning alert-sm mb-2" role="alert">
+                            <strong>${pieza.descripcion}</strong><br>
+                            <small>Stock: ${pieza.stock_actual} | Mínimo: ${pieza.stock_minimo}</small>
+                        </div>
+                    `;
+                }
+            });
+            
+            $('#alertas-activas').text(contadorAlertas);
+            
+            if (alertasHtml === '') {
+                alertasHtml = '<div class="text-center text-muted py-3"><i class="fas fa-check-circle text-success"></i> No hay alertas activas</div>';
+            }
+            
+            $('#alertas-recientes').html(alertasHtml);
+        });
+    }, 500);
+}
+
+function cargarMovimientosRecientes() {
+    $('#movimientos-recientes').html('<div class="text-center text-muted py-3"><i class="fas fa-spinner fa-spin"></i> Cargando...</div>');
+    
+    // Simular carga de movimientos
+    setTimeout(function() {
+        $('#movimientos-recientes').html(`
+            <div class="text-center text-muted py-3">
+                <i class="fas fa-info-circle"></i> 
+                Registra movimientos en la sección correspondiente
+            </div>
+        `);
+        $('#movimientos-hoy').text('0');
+    }, 700);
+}
+</script>
+{% endblock %} 
