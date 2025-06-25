@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block page_title %}Historial de Precios{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4>Historial de Precios</h4>
+        <p class="text-muted">Consulta y compara el historial de precios de componentes para optimizar compras</p>
+    </div>
+    <div class="btn-group">
+        <button class="btn btn-outline-success" onclick="exportarHistorial()">
+            <i class="fas fa-download me-2"></i>Exportar CSV
+        </button>
+        <button class="btn btn-primary" onclick="mostrarEstadisticas()">
+            <i class="fas fa-chart-bar me-2"></i>Estadísticas
+        </button>
+    </div>
+</div>
+
+<!-- Panel de Filtros -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-filter me-2"></i>Filtros de Búsqueda
+        </h6>
+    </div>
+    <div class="card-body">
+        <form id="filtrosForm">
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <label for="filtroPieza" class="form-label">Pieza/Componente</label>
+                    <select class="form-control" id="filtroPieza">
+                        <option value="">Todas las piezas</option>
+                        {% for pieza in piezas %}
+                        <option value="{{ pieza.id }}">{{ pieza.descripcion }} ({{ pieza.numero_serie }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label for="fechaInicio" class="form-label">Fecha Inicio</label>
+                    <input type="date" class="form-control" id="fechaInicio">
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label for="fechaFin" class="form-label">Fecha Fin</label>
+                    <input type="date" class="form-control" id="fechaFin">
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="filtroProveedor" class="form-label">Proveedor</label>
+                    <input type="text" class="form-control" id="filtroProveedor" placeholder="Nombre del proveedor">
+                </div>
+                <div class="col-md-2 mb-3 d-flex align-items-end">
+                    <button type="button" class="btn btn-primary w-100" onclick="aplicarFiltros()">
+                        <i class="fas fa-search me-1"></i>Buscar
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Resumen Estadístico -->
+<div class="row mb-4" id="resumenEstadisticas" style="display: none;">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Precio Mínimo</h6>
+                        <h4 id="precioMinimo">$0.00</h4>
+                    </div>
+                    <i class="fas fa-arrow-down fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Precio Máximo</h6>
+                        <h4 id="precioMaximo">$0.00</h4>
+                    </div>
+                    <i class="fas fa-arrow-up fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Precio Promedio</h6>
+                        <h4 id="precioPromedio">$0.00</h4>
+                    </div>
+                    <i class="fas fa-calculator fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Cambios</h6>
+                        <h4 id="totalCambios">0</h4>
+                    </div>
+                    <i class="fas fa-exchange-alt fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de Historial -->
+<div class="card">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-history me-2"></i>Historial de Cambios de Precios
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="tablaHistorial">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Pieza</th>
+                        <th>N° Serie</th>
+                        <th>Precio Anterior</th>
+                        <th>Precio Nuevo</th>
+                        <th>Diferencia</th>
+                        <th>% Variación</th>
+                        <th>Proveedor</th>
+                        <th>Motivo</th>
+                        <th>Usuario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Los datos se cargan vía JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        <div id="sinResultados" class="text-center py-4" style="display: none;">
+            <i class="fas fa-search fa-3x text-muted mb-3"></i>
+            <p class="text-muted">No se encontraron registros con los filtros aplicados</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Comparación Detallada -->
+<div class="modal fade" id="modalComparacion" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Análisis Detallado de Precios</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="contenidoComparacion">
+                    <!-- Contenido generado dinámicamente -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let historialData = [];
+let chartInstance = null;
+
+$(document).ready(function() {
+    cargarHistorial();
+    
+    // Configurar fecha por defecto (último mes)
+    const hoy = new Date();
+    const mesAnterior = new Date();
+    mesAnterior.setMonth(hoy.getMonth() - 1);
+    
+    $('#fechaFin').val(hoy.toISOString().split('T')[0]);
+    $('#fechaInicio').val(mesAnterior.toISOString().split('T')[0]);
+});
+
+function cargarHistorial() {
+    const filtros = obtenerFiltros();
+    
+    $.get('/api/historial-precios', filtros, function(data) {
+        historialData = data;
+        mostrarHistorial();
+    }).fail(function() {
+        alert('Error al cargar el historial de precios');
+    });
+}
+
+function obtenerFiltros() {
+    return {
+        pieza_id: $('#filtroPieza').val(),
+        fecha_inicio: $('#fechaInicio').val(),
+        fecha_fin: $('#fechaFin').val(),
+        proveedor: $('#filtroProveedor').val()
+    };
+}
+
+function aplicarFiltros() {
+    cargarHistorial();
+}
+
+function mostrarHistorial() {
+    let html = '';
+    
+    if (historialData.length === 0) {
+        $('#tablaHistorial tbody').html('');
+        $('#sinResultados').show();
+        return;
+    }
+    
+    $('#sinResultados').hide();
+    
+    historialData.forEach(function(registro) {
+        const precioAnterior = registro.precio_anterior || 0;
+        const precioNuevo = registro.precio_nuevo;
+        const diferencia = precioNuevo - precioAnterior;
+        const porcentaje = precioAnterior > 0 ? ((diferencia / precioAnterior) * 100).toFixed(2) : 'N/A';
+        
+        let claseVariacion = '';
+        let iconoVariacion = '';
+        
+        if (diferencia > 0) {
+            claseVariacion = 'text-danger';
+            iconoVariacion = '<i class="fas fa-arrow-up"></i>';
+        } else if (diferencia < 0) {
+            claseVariacion = 'text-success';
+            iconoVariacion = '<i class="fas fa-arrow-down"></i>';
+        } else {
+            claseVariacion = 'text-muted';
+            iconoVariacion = '<i class="fas fa-minus"></i>';
+        }
+        
+        html += `
+            <tr>
+                <td>${new Date(registro.created_at).toLocaleDateString('es-ES')}</td>
+                <td><strong>${registro.pieza_desc}</strong></td>
+                <td><code>${registro.numero_serie}</code></td>
+                <td>${precioAnterior > 0 ? '$' + precioAnterior.toFixed(2) : 'N/A'}</td>
+                <td>$${precioNuevo.toFixed(2)}</td>
+                <td class="${claseVariacion}">
+                    ${iconoVariacion} $${Math.abs(diferencia).toFixed(2)}
+                </td>
+                <td class="${claseVariacion}">
+                    ${porcentaje !== 'N/A' ? porcentaje + '%' : 'N/A'}
+                </td>
+                <td>${registro.proveedor || '-'}</td>
+                <td>${registro.motivo || '-'}</td>
+                <td>${registro.usuario_nombre}</td>
+            </tr>
+        `;
+    });
+    
+    $('#tablaHistorial tbody').html(html);
+}
+
+function mostrarEstadisticas() {
+    const piezaId = $('#filtroPieza').val();
+    
+    if (!piezaId) {
+        alert('Por favor selecciona una pieza específica para ver las estadísticas');
+        return;
+    }
+    
+    $.get('/api/historial-precios/estadisticas', { pieza_id: piezaId }, function(data) {
+        const estadisticas = data.estadisticas;
+        
+        if (estadisticas.total_cambios === 0) {
+            alert('No hay datos suficientes para mostrar estadísticas de esta pieza');
+            return;
+        }
+        
+        // Mostrar resumen estadístico
+        $('#precioMinimo').text('$' + estadisticas.precio_minimo.toFixed(2));
+        $('#precioMaximo').text('$' + estadisticas.precio_maximo.toFixed(2));
+        $('#precioPromedio').text('$' + estadisticas.precio_promedio.toFixed(2));
+        $('#totalCambios').text(estadisticas.total_cambios);
+        $('#resumenEstadisticas').show();
+        
+        // Crear gráfico de variación mensual
+        if (data.variacion_mensual.length > 0) {
+            crearGraficoVariacion(data.variacion_mensual);
+        }
+        
+        // Mostrar modal de comparación detallada
+        mostrarComparacionDetallada(data);
+        
+    }).fail(function() {
+        alert('Error al cargar las estadísticas');
+    });
+}
+
+function crearGraficoVariacion(datos) {
+    const ctx = document.createElement('canvas');
+    ctx.width = 400;
+    ctx.height = 200;
+    
+    const labels = datos.map(d => d.mes);
+    const precios = datos.map(d => d.precio_promedio);
+    
+    if (chartInstance) {
+        chartInstance.destroy();
+    }
+    
+    chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Precio Promedio',
+                data: precios,
+                borderColor: 'rgb(75, 192, 192)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Variación de Precios por Mes'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    return ctx;
+}
+
+function mostrarComparacionDetallada(data) {
+    const estadisticas = data.estadisticas;
+    const ultimoCambio = data.ultimo_cambio;
+    const variacionMensual = data.variacion_mensual;
+    
+    let contenido = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Resumen Estadístico</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Precio Mínimo:</span>
+                        <strong class="text-success">$${estadisticas.precio_minimo.toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Precio Máximo:</span>
+                        <strong class="text-danger">$${estadisticas.precio_maximo.toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Precio Promedio:</span>
+                        <strong class="text-info">$${estadisticas.precio_promedio.toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Total de Cambios:</span>
+                        <strong>${estadisticas.total_cambios}</strong>
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Información Adicional</h6>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Último Precio:</span>
+                        <strong>$${ultimoCambio.precio_nuevo.toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Última Actualización:</span>
+                        <small>${new Date(ultimoCambio.created_at).toLocaleDateString('es-ES')}</small>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Variación Total:</span>
+                        <strong class="${estadisticas.precio_maximo > estadisticas.precio_minimo ? 'text-warning' : 'text-success'}">
+                            ${((estadisticas.precio_maximo - estadisticas.precio_minimo) / estadisticas.precio_minimo * 100).toFixed(2)}%
+                        </strong>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    if (variacionMensual.length > 0) {
+        contenido += `
+            <div class="mt-4">
+                <h6>Gráfico de Variación Mensual</h6>
+                <div class="text-center">
+                    ${crearGraficoVariacion(variacionMensual).outerHTML}
+                </div>
+            </div>
+        `;
+    }
+    
+    $('#contenidoComparacion').html(contenido);
+    $('#modalComparacion').modal('show');
+}
+
+function exportarHistorial() {
+    const filtros = obtenerFiltros();
+    const params = new URLSearchParams(filtros);
+    
+    // Crear enlace de descarga
+    const url = '/api/historial-precios/exportar?' + params.toString();
+    
+    // Crear elemento temporal para descarga
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'historial_precios.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Mostrar mensaje de confirmación
+    alert('Archivo CSV descargado exitosamente');
+}
+</script>
+{% endblock %} 

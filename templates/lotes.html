@@ -1,0 +1,639 @@
+{% extends "base.html" %}
+
+{% block page_title %}Gestión de Lotes y Vencimientos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4>
+            <i class="fas fa-boxes me-2 text-primary"></i>
+            Gestión de Lotes y Vencimientos
+        </h4>
+        <p class="text-muted">Control de lotes con fechas de fabricación y vencimiento (U007)</p>
+    </div>
+    <div>
+        <button class="btn btn-warning me-2" onclick="verificarVencimientos()">
+            <i class="fas fa-clock me-1"></i>
+            Verificar Vencimientos
+        </button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalLote">
+            <i class="fas fa-plus me-1"></i>
+            Nuevo Lote
+        </button>
+    </div>
+</div>
+
+<!-- Alertas de Vencimiento -->
+<div id="alertas-vencimiento" class="mb-4"></div>
+
+<!-- Filtros -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Filtrar por Estado</label>
+                <select class="form-control" id="filtroEstado" onchange="filtrarLotes()">
+                    <option value="">Todos</option>
+                    <option value="activo">Activos</option>
+                    <option value="vencido">Vencidos</option>
+                    <option value="proximo">Próximos a Vencer</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Filtrar por Pieza</label>
+                <select class="form-control" id="filtroPieza" onchange="filtrarLotes()">
+                    <option value="">Todas las Piezas</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Buscar Lote</label>
+                <input type="text" class="form-control" id="buscarLote" placeholder="Número de lote..." onkeyup="filtrarLotes()">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-outline-secondary w-100" onclick="limpiarFiltros()">
+                    <i class="fas fa-eraser me-1"></i>
+                    Limpiar Filtros
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de Lotes -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="tablaLotes">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Número de Lote</th>
+                        <th>Pieza</th>
+                        <th>Cantidad</th>
+                        <th>Fabricación</th>
+                        <th>Vencimiento</th>
+                        <th>Estado</th>
+                        <th>Proveedor</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Lote -->
+<div class="modal fade" id="modalLote" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Nuevo Lote</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formLote">
+                    <input type="hidden" id="loteId">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="piezaId" class="form-label">Pieza *</label>
+                            <select class="form-control" id="piezaId" required>
+                                <option value="">Seleccionar pieza...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="numeroLote" class="form-label">Número de Lote *</label>
+                            <input type="text" class="form-control" id="numeroLote" required placeholder="Ej: LOT-2024-001">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="cantidadInicial" class="form-label">Cantidad Inicial *</label>
+                            <input type="number" class="form-control" id="cantidadInicial" min="1" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="fechaFabricacion" class="form-label">Fecha de Fabricación</label>
+                            <input type="date" class="form-control" id="fechaFabricacion">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="fechaVencimiento" class="form-label">Fecha de Vencimiento *</label>
+                            <input type="date" class="form-control" id="fechaVencimiento" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="proveedor" class="form-label">Proveedor</label>
+                        <input type="text" class="form-control" id="proveedor" placeholder="Nombre del proveedor">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" rows="3" placeholder="Notas adicionales sobre el lote"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarLote">Guardar Lote</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Movimiento de Lote -->
+<div class="modal fade" id="modalMovimientoLote" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Movimiento de Lote</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formMovimientoLote">
+                    <input type="hidden" id="movLoteId">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Lote</label>
+                        <input type="text" class="form-control" id="movLoteDesc" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Cantidad Disponible</label>
+                        <input type="text" class="form-control" id="movCantidadDisponible" readonly>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="movTipoMovimiento" class="form-label">Tipo de Movimiento *</label>
+                            <select class="form-control" id="movTipoMovimiento" required>
+                                <option value="">Seleccionar...</option>
+                                <option value="entrada">Entrada</option>
+                                <option value="salida">Salida</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="movCantidad" class="form-label">Cantidad *</label>
+                            <input type="number" class="form-control" id="movCantidad" min="1" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="movObservaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="movObservaciones" rows="3" placeholder="Motivo del movimiento"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGuardarMovimientoLote">Registrar Movimiento</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Detalles del Lote -->
+<div class="modal fade" id="modalDetallesLote" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalles del Lote</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detallesLoteContent">
+                <!-- Contenido se carga dinámicamente -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let lotes = [];
+let piezas = [];
+let lotesOriginal = [];
+
+$(document).ready(function() {
+    cargarPiezas();
+    cargarLotes();
+    verificarVencimientosAutomatico();
+    
+    $('#btnGuardarLote').click(guardarLote);
+    $('#btnGuardarMovimientoLote').click(guardarMovimientoLote);
+    
+    $('#modalLote').on('hidden.bs.modal', function() {
+        limpiarFormularioLote();
+    });
+    
+    // Establecer fecha mínima de vencimiento (hoy)
+    let hoy = new Date().toISOString().split('T')[0];
+    $('#fechaVencimiento').attr('min', hoy);
+});
+
+function cargarPiezas() {
+    $.get('/api/piezas', function(data) {
+        piezas = data;
+        let options = '<option value="">Seleccionar pieza...</option>';
+        piezas.forEach(function(pieza) {
+            options += `<option value="${pieza.id}">${pieza.descripcion} (${pieza.numero_serie})</option>`;
+        });
+        $('#piezaId').html(options);
+        $('#filtroPieza').html('<option value="">Todas las Piezas</option>' + options.replace('Seleccionar pieza...', 'Todas las Piezas'));
+    });
+}
+
+function cargarLotes() {
+    $.get('/api/lotes', function(data) {
+        lotes = data;
+        lotesOriginal = [...data];
+        mostrarLotes();
+    });
+}
+
+function mostrarLotes(lotesAMostrar = lotes) {
+    let html = '';
+    let hoy = new Date();
+    let fechaAlerta = new Date();
+    fechaAlerta.setDate(hoy.getDate() + 30);
+    
+    lotesAMostrar.forEach(function(lote) {
+        let fechaVencimiento = new Date(lote.fecha_vencimiento);
+        let estadoClass = '';
+        let estadoText = '';
+        let estadoBadge = '';
+        let diasRestantes = Math.ceil((fechaVencimiento - hoy) / (1000 * 60 * 60 * 24));
+        
+        if (fechaVencimiento < hoy) {
+            estadoClass = 'text-danger';
+            estadoText = 'VENCIDO';
+            estadoBadge = 'bg-danger';
+        } else if (fechaVencimiento <= fechaAlerta) {
+            estadoClass = 'text-warning';
+            estadoText = `Vence en ${diasRestantes} días`;
+            estadoBadge = 'bg-warning';
+        } else {
+            estadoClass = 'text-success';
+            estadoText = 'ACTIVO';
+            estadoBadge = 'bg-success';
+        }
+        
+        let cantidadClass = lote.cantidad_actual > 0 ? 'text-success' : 'text-muted';
+        
+        html += `
+            <tr>
+                <td>${lote.id}</td>
+                <td>
+                    <strong>${lote.numero_lote}</strong>
+                    <button class="btn btn-sm btn-outline-info ms-2" onclick="verDetallesLote(${lote.id})" title="Ver detalles">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                </td>
+                <td>
+                    <div>
+                        <strong>${lote.pieza_desc}</strong><br>
+                        <small class="text-muted">${lote.numero_serie}</small>
+                    </div>
+                </td>
+                <td><span class="${cantidadClass} fw-bold">${lote.cantidad_actual}/${lote.cantidad_inicial}</span></td>
+                <td>${lote.fecha_fabricacion ? new Date(lote.fecha_fabricacion).toLocaleDateString() : '-'}</td>
+                <td class="${estadoClass}">
+                    <strong>${new Date(lote.fecha_vencimiento).toLocaleDateString()}</strong>
+                </td>
+                <td>
+                    <span class="badge ${estadoBadge}">${estadoText}</span>
+                </td>
+                <td>${lote.proveedor || '-'}</td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-primary" onclick="editarLote(${lote.id})" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-success" onclick="abrirMovimientoLote(${lote.id})" title="Movimiento" ${lote.cantidad_actual === 0 ? 'disabled' : ''}>
+                            <i class="fas fa-exchange-alt"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="eliminarLote(${lote.id})" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    if (html === '') {
+        html = `
+            <tr>
+                <td colspan="9" class="text-center text-muted py-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No hay lotes que coincidan con los filtros aplicados
+                </td>
+            </tr>
+        `;
+    }
+    
+    $('#tablaLotes tbody').html(html);
+}
+
+function filtrarLotes() {
+    let filtroEstado = $('#filtroEstado').val();
+    let filtroPieza = $('#filtroPieza').val();
+    let buscarLote = $('#buscarLote').val().toLowerCase();
+    
+    let lotesFiltrados = lotesOriginal.filter(function(lote) {
+        let hoy = new Date();
+        let fechaVencimiento = new Date(lote.fecha_vencimiento);
+        let fechaAlerta = new Date();
+        fechaAlerta.setDate(hoy.getDate() + 30);
+        
+        // Filtro por estado
+        let pasaEstado = true;
+        if (filtroEstado) {
+            if (filtroEstado === 'vencido' && fechaVencimiento >= hoy) pasaEstado = false;
+            if (filtroEstado === 'proximo' && (fechaVencimiento < hoy || fechaVencimiento > fechaAlerta)) pasaEstado = false;
+            if (filtroEstado === 'activo' && fechaVencimiento <= fechaAlerta) pasaEstado = false;
+        }
+        
+        // Filtro por pieza
+        let pasaPieza = !filtroPieza || lote.pieza_id.toString() === filtroPieza;
+        
+        // Filtro por búsqueda de lote
+        let pasaBusqueda = !buscarLote || lote.numero_lote.toLowerCase().includes(buscarLote) || 
+                          lote.pieza_desc.toLowerCase().includes(buscarLote);
+        
+        return pasaEstado && pasaPieza && pasaBusqueda;
+    });
+    
+    mostrarLotes(lotesFiltrados);
+}
+
+function limpiarFiltros() {
+    $('#filtroEstado').val('');
+    $('#filtroPieza').val('');
+    $('#buscarLote').val('');
+    mostrarLotes(lotesOriginal);
+}
+
+function limpiarFormularioLote() {
+    $('#formLote')[0].reset();
+    $('#loteId').val('');
+    $('#modalTitle').text('Nuevo Lote');
+    let hoy = new Date().toISOString().split('T')[0];
+    $('#fechaVencimiento').attr('min', hoy);
+}
+
+function editarLote(id) {
+    let lote = lotes.find(l => l.id === id);
+    if (lote) {
+        $('#loteId').val(lote.id);
+        $('#piezaId').val(lote.pieza_id);
+        $('#numeroLote').val(lote.numero_lote);
+        $('#cantidadInicial').val(lote.cantidad_inicial);
+        $('#fechaFabricacion').val(lote.fecha_fabricacion);
+        $('#fechaVencimiento').val(lote.fecha_vencimiento);
+        $('#proveedor').val(lote.proveedor);
+        $('#observaciones').val(lote.observaciones);
+        $('#modalTitle').text('Editar Lote');
+        $('#cantidadInicial').prop('disabled', true); // No se puede cambiar la cantidad inicial
+        $('#modalLote').modal('show');
+    }
+}
+
+function guardarLote() {
+    let id = $('#loteId').val();
+    let data = {
+        pieza_id: parseInt($('#piezaId').val()),
+        numero_lote: $('#numeroLote').val(),
+        fecha_fabricacion: $('#fechaFabricacion').val() || null,
+        fecha_vencimiento: $('#fechaVencimiento').val(),
+        proveedor: $('#proveedor').val(),
+        observaciones: $('#observaciones').val()
+    };
+    
+    if (!id) {
+        data.cantidad_inicial = parseInt($('#cantidadInicial').val());
+    }
+    
+    let url = id ? `/api/lotes/${id}` : '/api/lotes';
+    let method = id ? 'PUT' : 'POST';
+    
+    $.ajax({
+        url: url,
+        method: method,
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function() {
+            $('#modalLote').modal('hide');
+            cargarLotes();
+            mostrarNotificacion('Lote guardado exitosamente', 'success');
+        },
+        error: function(xhr) {
+            let error = xhr.responseJSON ? xhr.responseJSON.error : 'Error al guardar el lote';
+            mostrarNotificacion(error, 'error');
+        }
+    });
+}
+
+function eliminarLote(id) {
+    if (confirm('¿Está seguro de eliminar este lote?')) {
+        $.ajax({
+            url: `/api/lotes/${id}`,
+            method: 'DELETE',
+            success: function() {
+                cargarLotes();
+                mostrarNotificacion('Lote eliminado exitosamente', 'success');
+            },
+            error: function(xhr) {
+                let error = xhr.responseJSON ? xhr.responseJSON.error : 'Error al eliminar el lote';
+                mostrarNotificacion(error, 'error');
+            }
+        });
+    }
+}
+
+function abrirMovimientoLote(id) {
+    let lote = lotes.find(l => l.id === id);
+    if (lote) {
+        $('#movLoteId').val(id);
+        $('#movLoteDesc').val(`${lote.numero_lote} - ${lote.pieza_desc}`);
+        $('#movCantidadDisponible').val(lote.cantidad_actual);
+        $('#formMovimientoLote')[0].reset();
+        $('#movLoteId').val(id);
+        $('#movLoteDesc').val(`${lote.numero_lote} - ${lote.pieza_desc}`);
+        $('#movCantidadDisponible').val(lote.cantidad_actual);
+        
+        // Establecer máximo para salidas
+        $('#movTipoMovimiento').change(function() {
+            if ($(this).val() === 'salida') {
+                $('#movCantidad').attr('max', lote.cantidad_actual);
+            } else {
+                $('#movCantidad').removeAttr('max');
+            }
+        });
+        
+        $('#modalMovimientoLote').modal('show');
+    }
+}
+
+function guardarMovimientoLote() {
+    let loteId = $('#movLoteId').val();
+    let data = {
+        tipo_movimiento: $('#movTipoMovimiento').val(),
+        cantidad: parseInt($('#movCantidad').val()),
+        observaciones: $('#movObservaciones').val()
+    };
+    
+    $.ajax({
+        url: `/api/lotes/${loteId}/movimiento`,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function() {
+            $('#modalMovimientoLote').modal('hide');
+            cargarLotes();
+            mostrarNotificacion('Movimiento registrado exitosamente', 'success');
+        },
+        error: function(xhr) {
+            let error = xhr.responseJSON ? xhr.responseJSON.error : 'Error al registrar el movimiento';
+            mostrarNotificacion(error, 'error');
+        }
+    });
+}
+
+function verDetallesLote(id) {
+    let lote = lotes.find(l => l.id === id);
+    if (lote) {
+        let hoy = new Date();
+        let fechaVencimiento = new Date(lote.fecha_vencimiento);
+        let diasRestantes = Math.ceil((fechaVencimiento - hoy) / (1000 * 60 * 60 * 24));
+        
+        let estadoHtml = '';
+        if (fechaVencimiento < hoy) {
+            estadoHtml = `<span class="badge bg-danger fs-6">VENCIDO (hace ${Math.abs(diasRestantes)} días)</span>`;
+        } else if (diasRestantes <= 30) {
+            estadoHtml = `<span class="badge bg-warning fs-6">Vence en ${diasRestantes} días</span>`;
+        } else {
+            estadoHtml = `<span class="badge bg-success fs-6">ACTIVO</span>`;
+        }
+        
+        let contenido = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Información del Lote</h6>
+                    <table class="table table-sm">
+                        <tr><td><strong>Número de Lote:</strong></td><td>${lote.numero_lote}</td></tr>
+                        <tr><td><strong>Pieza:</strong></td><td>${lote.pieza_desc}</td></tr>
+                        <tr><td><strong>Número de Serie:</strong></td><td>${lote.numero_serie}</td></tr>
+                        <tr><td><strong>Estado:</strong></td><td>${estadoHtml}</td></tr>
+                        <tr><td><strong>Proveedor:</strong></td><td>${lote.proveedor || '-'}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6>Fechas y Cantidades</h6>
+                    <table class="table table-sm">
+                        <tr><td><strong>Fecha Fabricación:</strong></td><td>${lote.fecha_fabricacion ? new Date(lote.fecha_fabricacion).toLocaleDateString() : '-'}</td></tr>
+                        <tr><td><strong>Fecha Vencimiento:</strong></td><td class="${fechaVencimiento < hoy ? 'text-danger' : ''}">${new Date(lote.fecha_vencimiento).toLocaleDateString()}</td></tr>
+                        <tr><td><strong>Cantidad Inicial:</strong></td><td>${lote.cantidad_inicial}</td></tr>
+                        <tr><td><strong>Cantidad Actual:</strong></td><td><span class="badge ${lote.cantidad_actual > 0 ? 'bg-success' : 'bg-secondary'}">${lote.cantidad_actual}</span></td></tr>
+                        <tr><td><strong>Cantidad Utilizada:</strong></td><td>${lote.cantidad_inicial - lote.cantidad_actual}</td></tr>
+                    </table>
+                </div>
+            </div>
+            ${lote.observaciones ? `
+                <div class="mt-3">
+                    <h6>Observaciones</h6>
+                    <p class="bg-light p-3 rounded">${lote.observaciones}</p>
+                </div>
+            ` : ''}
+        `;
+        
+        $('#detallesLoteContent').html(contenido);
+        $('#modalDetallesLote').modal('show');
+    }
+}
+
+function verificarVencimientos() {
+    $.ajax({
+        url: '/api/verificar-vencimientos',
+        method: 'POST',
+        success: function(response) {
+            if (response.alertas_creadas > 0) {
+                mostrarNotificacion(`Se crearon ${response.alertas_creadas} alertas de vencimiento`, 'warning');
+            } else {
+                mostrarNotificacion('No se encontraron nuevos vencimientos', 'info');
+            }
+            cargarAlertasVencimiento();
+        },
+        error: function() {
+            mostrarNotificacion('Error al verificar vencimientos', 'error');
+        }
+    });
+}
+
+function verificarVencimientosAutomatico() {
+    // Verificación automática cada vez que se carga la página
+    $.post('/api/verificar-vencimientos', function() {
+        cargarAlertasVencimiento();
+    });
+}
+
+function cargarAlertasVencimiento() {
+    $.get('/api/lotes/vencimientos', function(lotesVencimiento) {
+        if (lotesVencimiento.length > 0) {
+            let alertasHtml = '<div class="alert alert-warning alert-dismissible fade show" role="alert">';
+            alertasHtml += '<h6><i class="fas fa-exclamation-triangle me-2"></i>Alertas de Vencimiento</h6>';
+            alertasHtml += '<ul class="mb-0">';
+            
+            lotesVencimiento.forEach(function(lote) {
+                let fechaVencimiento = new Date(lote.fecha_vencimiento);
+                let hoy = new Date();
+                let diasRestantes = Math.ceil((fechaVencimiento - hoy) / (1000 * 60 * 60 * 24));
+                
+                if (diasRestantes < 0) {
+                    alertasHtml += `<li><strong>${lote.numero_lote}</strong> (${lote.pieza_desc}) - VENCIDO hace ${Math.abs(diasRestantes)} días</li>`;
+                } else {
+                    alertasHtml += `<li><strong>${lote.numero_lote}</strong> (${lote.pieza_desc}) - Vence en ${diasRestantes} días</li>`;
+                }
+            });
+            
+            alertasHtml += '</ul>';
+            alertasHtml += '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+            alertasHtml += '</div>';
+            
+            $('#alertas-vencimiento').html(alertasHtml);
+        } else {
+            $('#alertas-vencimiento').html('');
+        }
+    });
+}
+
+function mostrarNotificacion(mensaje, tipo) {
+    let alertClass = {
+        'success': 'alert-success',
+        'error': 'alert-danger',
+        'warning': 'alert-warning',
+        'info': 'alert-info'
+    }[tipo] || 'alert-info';
+    
+    let icono = {
+        'success': 'fas fa-check-circle',
+        'error': 'fas fa-times-circle',
+        'warning': 'fas fa-exclamation-triangle',
+        'info': 'fas fa-info-circle'
+    }[tipo] || 'fas fa-info-circle';
+    
+    let html = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            <i class="${icono} me-2"></i>${mensaje}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    $('main').prepend(html);
+    setTimeout(function() {
+        $('.alert').fadeOut();
+    }, 5000);
+}
+</script>
+{% endblock %}

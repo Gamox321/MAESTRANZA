@@ -1,0 +1,558 @@
+{% extends "base.html" %}
+
+{% block page_title %}Reportes de Movimientos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4>Reportes de Movimientos</h4>
+        <p class="text-muted">Genera reportes mensuales de movimientos para análisis y compliance</p>
+    </div>
+    <div class="btn-group">
+        <button class="btn btn-outline-danger" onclick="exportarPDF()" id="btnPDF">
+            <i class="fas fa-file-pdf me-2"></i>Exportar PDF
+        </button>
+        <button class="btn btn-outline-success" onclick="exportarExcel()" id="btnExcel">
+            <i class="fas fa-file-excel me-2"></i>Exportar Excel
+        </button>
+        <button class="btn btn-primary" onclick="generarEstadisticas()" id="btnStats">
+            <i class="fas fa-chart-bar me-2"></i>Estadísticas
+        </button>
+    </div>
+</div>
+
+<!-- Panel de Filtros -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-filter me-2"></i>Filtros de Reporte
+        </h6>
+    </div>
+    <div class="card-body">
+        <form id="filtrosReporte">
+            <div class="row">
+                <div class="col-md-2 mb-3">
+                    <label for="fechaInicio" class="form-label">Fecha Inicio</label>
+                    <input type="date" class="form-control" id="fechaInicio" required>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label for="fechaFin" class="form-label">Fecha Fin</label>
+                    <input type="date" class="form-control" id="fechaFin" required>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label for="filtroPieza" class="form-label">Componente</label>
+                    <select class="form-control" id="filtroPieza">
+                        <option value="">Todos los componentes</option>
+                        {% for pieza in piezas %}
+                        <option value="{{ pieza.id }}">{{ pieza.descripcion }} ({{ pieza.numero_serie }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label for="tipoMovimiento" class="form-label">Tipo</label>
+                    <select class="form-control" id="tipoMovimiento">
+                        <option value="">Todos</option>
+                        <option value="entrada">Entradas</option>
+                        <option value="salida">Salidas</option>
+                    </select>
+                </div>
+                <div class="col-md-2 mb-3">
+                    <label for="filtroUsuario" class="form-label">Usuario</label>
+                    <select class="form-control" id="filtroUsuario">
+                        <option value="">Todos los usuarios</option>
+                        {% for usuario in usuarios %}
+                        <option value="{{ usuario.id }}">{{ usuario.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-1 mb-3 d-flex align-items-end">
+                    <button type="button" class="btn btn-primary w-100" onclick="cargarReporte()">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+        </form>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="setRangoMes('actual')">Este mes</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="setRangoMes('anterior')">Mes anterior</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="setRangoMes('trimestre')">Último trimestre</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="limpiarFiltros()">Limpiar filtros</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen Estadístico -->
+<div class="row mb-4" id="resumenStats" style="display: none;">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Movimientos</h6>
+                        <h4 id="totalMovimientos">0</h4>
+                    </div>
+                    <i class="fas fa-exchange-alt fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Entradas</h6>
+                        <h4 id="totalEntradas">0</h4>
+                    </div>
+                    <i class="fas fa-arrow-down fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Total Salidas</h6>
+                        <h4 id="totalSalidas">0</h4>
+                    </div>
+                    <i class="fas fa-arrow-up fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-title">Piezas Involucradas</h6>
+                        <h4 id="piezasInvolucradas">0</h4>
+                    </div>
+                    <i class="fas fa-cogs fa-2x"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de Movimientos -->
+<div class="card">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <i class="fas fa-list me-2"></i>Movimientos de Inventario
+            <span class="badge bg-secondary ms-2" id="contadorRegistros">0 registros</span>
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm" id="tablaMovimientos">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha/Hora</th>
+                        <th>Origen</th>
+                        <th>Componente</th>
+                        <th>N° Serie</th>
+                        <th>Ubicación</th>
+                        <th>Tipo</th>
+                        <th>Cantidad</th>
+                        <th>Usuario</th>
+                        <th>Rol</th>
+                        <th>Observaciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Los datos se cargan vía JavaScript -->
+                </tbody>
+            </table>
+        </div>
+        <div id="sinDatos" class="text-center py-4" style="display: none;">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <p class="text-muted">No se encontraron movimientos en el período seleccionado</p>
+        </div>
+        <div id="cargando" class="text-center py-4" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <p class="text-muted mt-2">Generando reporte...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Estadísticas Detalladas -->
+<div class="modal fade" id="modalEstadisticas" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Análisis Estadístico Detallado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="contenidoEstadisticas">
+                    <!-- Contenido generado dinámicamente -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let movimientosData = [];
+let chartDiario = null;
+let chartUsuarios = null;
+
+$(document).ready(function() {
+    // Configurar fechas por defecto (mes actual)
+    setRangoMes('actual');
+    cargarReporte();
+});
+
+function setRangoMes(tipo) {
+    const hoy = new Date();
+    let fechaInicio, fechaFin;
+    
+    switch(tipo) {
+        case 'actual':
+            fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+            fechaFin = hoy;
+            break;
+        case 'anterior':
+            fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+            fechaFin = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+            break;
+        case 'trimestre':
+            fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth() - 2, 1);
+            fechaFin = hoy;
+            break;
+    }
+    
+    $('#fechaInicio').val(fechaInicio.toISOString().split('T')[0]);
+    $('#fechaFin').val(fechaFin.toISOString().split('T')[0]);
+}
+
+function limpiarFiltros() {
+    $('#filtroPieza').val('');
+    $('#tipoMovimiento').val('');
+    $('#filtroUsuario').val('');
+    setRangoMes('actual');
+}
+
+function obtenerFiltros() {
+    return {
+        fecha_inicio: $('#fechaInicio').val(),
+        fecha_fin: $('#fechaFin').val(),
+        pieza_id: $('#filtroPieza').val(),
+        tipo_movimiento: $('#tipoMovimiento').val(),
+        usuario_id: $('#filtroUsuario').val()
+    };
+}
+
+function cargarReporte() {
+    mostrarCargando(true);
+    
+    const filtros = obtenerFiltros();
+    
+    if (!filtros.fecha_inicio || !filtros.fecha_fin) {
+        alert('Por favor selecciona un rango de fechas válido');
+        mostrarCargando(false);
+        return;
+    }
+    
+    $.get('/api/reportes/movimientos', filtros, function(data) {
+        movimientosData = data;
+        mostrarMovimientos();
+        mostrarCargando(false);
+    }).fail(function() {
+        alert('Error al cargar el reporte de movimientos');
+        mostrarCargando(false);
+    });
+}
+
+function mostrarCargando(estado) {
+    if (estado) {
+        $('#cargando').show();
+        $('#tablaMovimientos tbody').empty();
+        $('#sinDatos').hide();
+    } else {
+        $('#cargando').hide();
+    }
+}
+
+function mostrarMovimientos() {
+    let html = '';
+    
+    if (movimientosData.length === 0) {
+        $('#tablaMovimientos tbody').html('');
+        $('#sinDatos').show();
+        $('#contadorRegistros').text('0 registros');
+        return;
+    }
+    
+    $('#sinDatos').hide();
+    $('#contadorRegistros').text(`${movimientosData.length} registros`);
+    
+    movimientosData.forEach(function(mov) {
+        const fecha = new Date(mov.created_at).toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        const tipoClass = mov.tipo_movimiento === 'entrada' ? 'success' : 'danger';
+        const tipoIcon = mov.tipo_movimiento === 'entrada' ? 'arrow-down' : 'arrow-up';
+        
+        html += `
+            <tr>
+                <td><small>${fecha}</small></td>
+                <td>
+                    <span class="badge bg-${mov.tipo_origen === 'pieza' ? 'primary' : 'secondary'}">
+                        ${mov.tipo_origen === 'pieza' ? 'Pieza' : 'Lote'}
+                    </span>
+                </td>
+                <td><strong>${mov.componente}</strong></td>
+                <td><code>${mov.numero_serie}</code></td>
+                <td><small>${mov.ubicacion_fisica}</small></td>
+                <td>
+                    <span class="badge bg-${tipoClass}">
+                        <i class="fas fa-${tipoIcon} me-1"></i>${mov.tipo_movimiento.charAt(0).toUpperCase() + mov.tipo_movimiento.slice(1)}
+                    </span>
+                </td>
+                <td><strong>${mov.cantidad}</strong></td>
+                <td>${mov.usuario_nombre}</td>
+                <td><small class="text-muted">${mov.usuario_rol}</small></td>
+                <td><small>${mov.observaciones || '-'}</small></td>
+            </tr>
+        `;
+    });
+    
+    $('#tablaMovimientos tbody').html(html);
+}
+
+function generarEstadisticas() {
+    const filtros = obtenerFiltros();
+    
+    if (!filtros.fecha_inicio || !filtros.fecha_fin) {
+        alert('Por favor selecciona un rango de fechas para generar estadísticas');
+        return;
+    }
+    
+    $.get('/api/reportes/estadisticas', filtros, function(data) {
+        mostrarResumenEstadisticas(data.estadisticas_generales);
+        mostrarEstadisticasDetalladas(data);
+    }).fail(function() {
+        alert('Error al cargar las estadísticas');
+    });
+}
+
+function mostrarResumenEstadisticas(stats) {
+    $('#totalMovimientos').text(stats.total_movimientos || 0);
+    $('#totalEntradas').text(stats.total_entradas || 0);
+    $('#totalSalidas').text(stats.total_salidas || 0);
+    $('#piezasInvolucradas').text(stats.piezas_involucradas || 0);
+    $('#resumenStats').show();
+}
+
+function mostrarEstadisticasDetalladas(data) {
+    const stats = data.estadisticas_generales;
+    const topPiezas = data.top_piezas;
+    const movDiarios = data.movimientos_diarios;
+    const movUsuarios = data.movimientos_por_usuario;
+    
+    let contenido = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Top 5 Componentes con Más Movimientos</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Componente</th>
+                                <th>Movimientos</th>
+                                <th>Cantidad Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
+    
+    topPiezas.forEach(pieza => {
+        contenido += `
+            <tr>
+                <td><strong>${pieza.descripcion}</strong><br><small>${pieza.numero_serie}</small></td>
+                <td><span class="badge bg-primary">${pieza.cantidad_movimientos}</span></td>
+                <td>${pieza.cantidad_total}</td>
+            </tr>
+        `;
+    });
+    
+    contenido += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6>Movimientos por Usuario</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Rol</th>
+                                <th>Movimientos</th>
+                                <th>Cantidad Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
+    
+    movUsuarios.forEach(usuario => {
+        contenido += `
+            <tr>
+                <td><strong>${usuario.nombre}</strong></td>
+                <td><small class="text-muted">${usuario.rol}</small></td>
+                <td><span class="badge bg-info">${usuario.cantidad_movimientos}</span></td>
+                <td>${usuario.cantidad_total}</td>
+            </tr>
+        `;
+    });
+    
+    contenido += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (movDiarios.length > 0) {
+        contenido += `
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h6>Tendencia de Movimientos Diarios (Últimos 30 días)</h6>
+                    <canvas id="chartMovimientosDiarios" width="400" height="100"></canvas>
+                </div>
+            </div>
+        `;
+    }
+    
+    $('#contenidoEstadisticas').html(contenido);
+    
+    // Crear gráfico si hay datos
+    if (movDiarios.length > 0) {
+        setTimeout(() => crearGraficoDiario(movDiarios), 100);
+    }
+    
+    $('#modalEstadisticas').modal('show');
+}
+
+function crearGraficoDiario(datos) {
+    const ctx = document.getElementById('chartMovimientosDiarios');
+    
+    if (chartDiario) {
+        chartDiario.destroy();
+    }
+    
+    const labels = datos.map(d => d.fecha).reverse();
+    const entradas = datos.map(d => d.entradas).reverse();
+    const salidas = datos.map(d => d.salidas).reverse();
+    
+    chartDiario = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Entradas',
+                data: entradas,
+                borderColor: 'rgb(40, 167, 69)',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.1
+            }, {
+                label: 'Salidas',
+                data: salidas,
+                borderColor: 'rgb(220, 53, 69)',
+                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Movimientos por Día'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function exportarPDF() {
+    const filtros = obtenerFiltros();
+    
+    if (!filtros.fecha_inicio || !filtros.fecha_fin) {
+        alert('Por favor selecciona un rango de fechas antes de exportar');
+        return;
+    }
+    
+    $('#btnPDF').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Generando PDF...');
+    
+    const params = new URLSearchParams(filtros);
+    const url = '/api/reportes/exportar-pdf?' + params.toString();
+    
+    // Crear enlace de descarga
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'reporte_movimientos.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setTimeout(() => {
+        $('#btnPDF').prop('disabled', false).html('<i class="fas fa-file-pdf me-2"></i>Exportar PDF');
+    }, 2000);
+}
+
+function exportarExcel() {
+    const filtros = obtenerFiltros();
+    
+    if (!filtros.fecha_inicio || !filtros.fecha_fin) {
+        alert('Por favor selecciona un rango de fechas antes de exportar');
+        return;
+    }
+    
+    $('#btnExcel').prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Generando Excel...');
+    
+    const params = new URLSearchParams(filtros);
+    const url = '/api/reportes/exportar-excel?' + params.toString();
+    
+    // Crear enlace de descarga
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'reporte_movimientos.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setTimeout(() => {
+        $('#btnExcel').prop('disabled', false).html('<i class="fas fa-file-excel me-2"></i>Exportar Excel');
+    }, 2000);
+}
+</script>
+{% endblock %} 
